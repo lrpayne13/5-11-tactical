@@ -61,7 +61,7 @@ def create_country_choropleth():
 app = dash.Dash(__name__)
 
 app.layout = html.Div([
-    html.H1('Interactive Dashboard'),
+    html.H1('Loud Interactive SEO Dashboard'),
 
     dcc.Tabs([
         dcc.Tab(label='Clicks Over Time', children=[
