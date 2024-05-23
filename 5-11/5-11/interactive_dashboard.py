@@ -5,6 +5,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import pandas as pd
 import plotly.express as px
+import pandas as pd
 
 # Load data
 df_pages = pd.read_csv('./Pages.csv')
@@ -368,4 +369,5 @@ def update_bar_graph(selected_metric):
     return create_bar_figure(selected_metric)
 
 if __name__ == '__main__':
-    app.run_server(debug=True, port=8005)
+    port = int(os.environ.get('PORT', 8050))
+    app.run_server(debug=True, host='0.0.0.0', port=port)
