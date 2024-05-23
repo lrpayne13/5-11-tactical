@@ -6,7 +6,7 @@ from plotly.subplots import make_subplots
 import pandas as pd
 import plotly.express as px
 import pandas as pd
-import os 
+import os
 
 # Load data
 df_pages = pd.read_csv('./Pages.csv')
