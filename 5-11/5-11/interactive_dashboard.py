@@ -1,8 +1,10 @@
 import dash
 from dash import dcc, html, dash_table
 from dash.dependencies import Input, Output, State
-import plotly.express as px
+import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 import pandas as pd
+import plotly.express as px
 
 # Load data
 df_pages = pd.read_csv('./Pages.csv')
@@ -86,7 +88,15 @@ app.layout = html.Div([
                 ],
                 data=[],
                 row_selectable='single',
-                selected_rows=[]
+                selected_rows=[],
+                style_cell_conditional=[
+                    {'if': {'column_id': 'Top pages'},
+                     'whiteSpace': 'normal',
+                     'maxWidth': '150px',
+                     'overflow': 'hidden',
+                     'textOverflow': 'ellipsis'}
+                ],
+                style_table={'height': '300px', 'overflowY': 'auto'}
             ),
             html.Div(id='link-container', children=[
                 html.A(id='link-pages', children="Click on a row to visit the page", href="", target="_blank", style={'marginTop': '20px'})
@@ -111,7 +121,15 @@ app.layout = html.Div([
                 ],
                 data=[],
                 row_selectable='single',
-                selected_rows=[]
+                selected_rows=[],
+                style_cell_conditional=[
+                    {'if': {'column_id': 'Top queries'},
+                     'whiteSpace': 'normal',
+                     'maxWidth': '150px',
+                     'overflow': 'hidden',
+                     'textOverflow': 'ellipsis'}
+                ],
+                style_table={'height': '300px', 'overflowY': 'auto'}
             ),
             html.Div(id='query-details', style={'marginTop': '20px', 'whiteSpace': 'pre-line'})
         ]),
@@ -141,25 +159,42 @@ app.layout = html.Div([
      Input('position-store', 'data')]
 )
 def update_line_graph(show_clicks, show_impressions, show_ctr, show_position):
-    fig = px.line(df_dates, x='Date', y=[], title='Clicks Over Time')
+    fig = make_subplots(specs=[[{"secondary_y": True}]])
 
     if show_clicks:
-        fig.add_scatter(x=df_dates['Date'], y=df_dates['Clicks'], mode='lines+markers', name='Clicks', hovertemplate="Clicks: %{y}<extra></extra>")
+        fig.add_trace(
+            go.Scatter(x=df_dates['Date'], y=df_dates['Clicks'], mode='lines+markers', name='Clicks', hovertemplate="Clicks: %{y}<extra></extra>"),
+            secondary_y=False,
+        )
     if show_impressions:
-        fig.add_scatter(x=df_dates['Date'], y=df_dates['Impressions'], mode='lines+markers', name='Impressions', hovertemplate="Impressions: %{y}<extra></extra>")
+        fig.add_trace(
+            go.Scatter(x=df_dates['Date'], y=df_dates['Impressions'], mode='lines+markers', name='Impressions', hovertemplate="Impressions: %{y}<extra></extra>"),
+            secondary_y=False,
+        )
     if show_ctr:
-        fig.add_scatter(x=df_dates['Date'], y=df_dates['CTR'], mode='lines+markers', name='CTR', hovertemplate="CTR: %{y:.2%}<extra></extra>")
+        fig.add_trace(
+            go.Scatter(x=df_dates['Date'], y=df_dates['CTR'], mode='lines+markers', name='CTR', hovertemplate="CTR: %{y:.2%}<extra></extra>"),
+            secondary_y=True,
+        )
     if show_position:
-        fig.add_scatter(x=df_dates['Date'], y=df_dates['Position'], mode='lines+markers', name='Position', hovertemplate="Position: %{y}<extra></extra>")
+        fig.add_trace(
+            go.Scatter(x=df_dates['Date'], y=df_dates['Position'], mode='lines+markers', name='Position', hovertemplate="Position: %{y}<extra></extra>"),
+            secondary_y=True,
+        )
 
-    fig.update_layout(hovermode='x unified')
     fig.update_layout(
+        title_text="Clicks Over Time",
+        hovermode='x unified',
         hoverlabel=dict(
             bgcolor="white",
             font_size=16,
             font_family="Rockwell"
         )
     )
+
+    fig.update_yaxes(title_text="Clicks and Impressions", secondary_y=False)
+    fig.update_yaxes(title_text="CTR and Position", secondary_y=True)
+
     return fig
 
 @app.callback(
@@ -245,8 +280,33 @@ def update_bar_plot_pages(selected_rows, data):
     if selected_rows:
         selected_data = [data[i] for i in selected_rows]
         df_selected = pd.DataFrame(selected_data)
-        df_long = pd.melt(df_selected, id_vars=['Top pages'], value_vars=['Clicks', 'Impressions', 'CTR', 'Position'], var_name='Metric', value_name='Value')
-        fig = px.bar(df_long, x='Top pages', y='Value', color='Metric', barmode='group')
+
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        for column in ['Clicks', 'Impressions']:
+            fig.add_trace(
+                go.Bar(x=df_selected['Top pages'], y=df_selected[column], name=column, yaxis='y'),
+                secondary_y=False,
+            )
+        for column in ['CTR', 'Position']:
+            fig.add_trace(
+                go.Scatter(x=df_selected['Top pages'], y=df_selected[column], name=column, mode='lines+markers', yaxis='y2'),
+                secondary_y=True,
+            )
+
+        threshold = 2000
+        if df_selected['Impressions'].max() - df_selected['Clicks'].max() < threshold:
+            fig.update_yaxes(type="linear", secondary_y=False)
+        else:
+            fig.update_yaxes(type="log", secondary_y=False)
+
+        fig.update_layout(
+            title_text="CTR vs Position (Pages)",
+            barmode='group'
+        )
+
+        fig.update_yaxes(title_text="Clicks and Impressions", secondary_y=False)
+        fig.update_yaxes(title_text="CTR and Position", secondary_y=True)
+
         return fig
     return {}
 
@@ -259,8 +319,33 @@ def update_bar_plot_queries(selected_rows, data):
     if selected_rows:
         selected_data = [data[i] for i in selected_rows]
         df_selected = pd.DataFrame(selected_data)
-        df_long = pd.melt(df_selected, id_vars=['Top queries'], value_vars=['Clicks', 'Impressions', 'CTR', 'Position'], var_name='Metric', value_name='Value')
-        fig = px.bar(df_long, x='Top queries', y='Value', color='Metric', barmode='group')
+
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        for column in ['Clicks', 'Impressions']:
+            fig.add_trace(
+                go.Bar(x=df_selected['Top queries'], y=df_selected[column], name=column, yaxis='y'),
+                secondary_y=False,
+            )
+        for column in ['CTR', 'Position']:
+            fig.add_trace(
+                go.Scatter(x=df_selected['Top queries'], y=df_selected[column], name=column, mode='lines+markers', yaxis='y2'),
+                secondary_y=True,
+            )
+
+        threshold = 2000
+        if df_selected['Impressions'].max() - df_selected['Clicks'].max() < threshold:
+            fig.update_yaxes(type="linear", secondary_y=False)
+        else:
+            fig.update_yaxes(type="log", secondary_y=False)
+
+        fig.update_layout(
+            title_text="CTR vs Position (Queries)",
+            barmode='group'
+        )
+
+        fig.update_yaxes(title_text="Clicks and Impressions", secondary_y=False)
+        fig.update_yaxes(title_text="CTR and Position", secondary_y=True)
+
         return fig
     return {}
 
